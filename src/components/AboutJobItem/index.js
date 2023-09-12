@@ -125,7 +125,11 @@ class AboutJobItem extends Component {
         <div>
           <h1>Skills</h1>
           <ul>
-            <li>skills</li>
+            {skills.map(eachItem => (
+              <li key={eachItem.name}>
+                <p>{eachItem.name}</p>
+              </li>
+            ))}
           </ul>
         </div>
         <div>
