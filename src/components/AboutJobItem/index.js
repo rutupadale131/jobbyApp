@@ -2,83 +2,89 @@ import {Component} from 'react'
 import Cookies from 'js-cookie'
 import {AiFillStar} from 'react-icons/ai'
 import {MdLocationOn} from 'react-icons/md'
-import Header from '../Header'
 
-import './index.css'
+import Loader from 'react-loader-spinner'
+
+const apiStatusConstants = {
+  initial: 'INITIAL',
+  inProgress: 'IN_PROGRESS',
+  success: 'SUCCESS',
+  failure: 'FAILURE',
+}
 
 class AboutJobItem extends Component {
-  state = {jobDetails: [], similarJobs: []}
+  state = {
+    apiStatus: apiStatusConstants.initial,
+    jobDetails: [],
+    similarJobDetails: [],
+  }
 
   componentDidMount() {
     this.getJobData()
   }
 
-  updateJobDetailsData = job => ({
-    companyLogoUrl: job.company_logo_url,
-    companyWebsiteUrl: job.company_website_url,
-    employmentType: job.employment_type,
-    id: job.id,
-    jobDescription: job.job_description,
-    skills: job.skills.map(eachSkill => ({
-      imageUrl: eachSkill.image_url,
-      name: eachSkill.name,
-    })),
-    lifeAtCompany: {
-      description: job.life_at_company.description,
-      imageUrl: job.life_at_company.image_url,
-    },
-    location: job.location,
-    rating: job.rating,
-    packagePerAnnum: job.package_per_annum,
-  })
-
-  updateSimilarJobsData = similarJob => ({
-    companyLogoUrl: similarJob.company_logo_url,
-    employmentType: similarJob.employment_type,
-    id: similarJob.id,
-    jobDescription: similarJob.job_description,
-    location: similarJob.location,
-    rating: similarJob.rating,
-    title: similarJob.title,
-  })
-
   getJobData = async () => {
-    const jwtToken = Cookies.get('jwt_token')
-
     const {match} = this.props
     const {params} = match
     const {id} = params
-
-    const url = `https://apis.ccbp.in/jobs/${id}`
-    console.log(url)
-    const options = {
+    this.setState({apiStatus: apiStatusConstants.inProgress})
+    const jwtToken = Cookies.get('jwt_token')
+    const apiUrl = `https://apis.ccbp.in/jobs/${id}`
+    const optionsData = {
       headers: {
         Authorization: `Bearer ${jwtToken}`,
       },
       method: 'GET',
     }
-    console.log(options)
+    const response = await fetch(apiUrl, optionsData)
 
-    const response = await fetch(url, options)
-    const data = await response.json()
-    console.log(data)
-    const jobDetailsData = data.job_details
-    const similarJobsData = data.similar_jobs
+    if (response.ok === true) {
+      const fetchedJobData = await response.json()
+      const updatedJobDetailsData = [fetchedJobData.job_details].map(job => ({
+        companyLogoUrl: job.company_logo_url,
+        companyWebsiteUrl: job.company_website_url,
+        employmentType: job.employment_type,
+        id: job.id,
+        jobDescription: job.job_description,
+        skills: job.skills.map(eachSkill => ({
+          imageUrl: eachSkill.image_url,
+          name: eachSkill.name,
+        })),
+        lifeAtCompany: {
+          description: job.life_at_company.description,
+          imageUrl: job.life_at_company.image_url,
+        },
+        location: job.location,
+        rating: job.rating,
+        packagePerAnnum: job.package_per_annum,
+        title: job.title,
+      }))
 
-    const updatedJobDetails = this.updateJobDetailsData(jobDetailsData)
+      const updatedSimilarJobsData = fetchedJobData.similar_jobs.map(
+        similarJob => ({
+          companyLogoUrl: similarJob.company_logo_url,
+          employmentType: similarJob.employment_type,
+          id: similarJob.id,
+          jobDescription: similarJob.job_description,
+          location: similarJob.location,
+          rating: similarJob.rating,
+          title: similarJob.title,
+        }),
+      )
 
-    const updatedSimilarJobs = similarJobsData.map(eachJob =>
-      this.updateSimilarJobsData(eachJob),
-    )
-
-    this.setState({
-      jobDetails: updatedJobDetails,
-      similarJobs: updatedSimilarJobs,
-    })
+      console.log(updatedSimilarJobsData)
+      this.setState({
+        apiStatus: apiStatusConstants.success,
+        jobDetails: updatedJobDetailsData,
+        similarJobDetails: updatedSimilarJobsData,
+      })
+    } else {
+      this.setState({apiStatus: apiStatusConstants.failure})
+    }
   }
 
-  renderJobDetails = () => {
-    const {jobDetails} = this.state
+  renderJobDetailsSuccessView = () => {
+    const {jobDetails, apiStatus} = this.state
     const {
       companyLogoUrl,
       title,
@@ -89,7 +95,8 @@ class AboutJobItem extends Component {
       packagePerAnnum,
       skills,
     } = jobDetails
-    console.log(skills)
+    console.log(jobDetails)
+    console.log(apiStatus)
 
     return (
       <div className="job-item">
@@ -125,9 +132,9 @@ class AboutJobItem extends Component {
         <div>
           <h1>Skills</h1>
           <ul>
-            {skills.map(eachItem => (
-              <li key={eachItem.name}>
-                <p>{eachItem.name}</p>
+            {skills.map(eachSkill => (
+              <li key={eachSkill.name}>
+                <p>{eachSkill.name}</p>
               </li>
             ))}
           </ul>
@@ -141,15 +148,47 @@ class AboutJobItem extends Component {
     )
   }
 
+  renderJobDetailsFailureView = () => (
+    <div>
+      <img
+        src="https://assets.ccbp.in/frontend/react-js/failure-img.pnghttps://assets.ccbp.in/frontend/react-js/failure-img.png"
+        alt="failure view"
+      />
+      <h1>Oops! Something Went Wrong</h1>
+      <p>We cannot seem to find the page you are looking for.</p>
+      <button type="button" onClick={this.onClickRetryJobs}>
+        Retry
+      </button>
+    </div>
+  )
+
+  renderLoadingView = () => (
+    <div data-testid="loader" className="no-jobs-bg">
+      <Loader type="ThreeDots" color="#0b69ff" height="50" width="50" />
+    </div>
+  )
+
+  renderPageView = () => {
+    const {apiStatus} = this.state
+
+    switch (apiStatus) {
+      case apiStatusConstants.inProgress:
+        return this.renderLoadingView()
+      case apiStatusConstants.failure:
+        return this.renderJobDetailsFailureView()
+      case apiStatusConstants.success:
+        return this.renderJobDetailsSuccessView()
+      default:
+        return null
+    }
+  }
+
   render() {
-    const {similarJobs} = this.state
-    console.log(similarJobs)
-    return (
-      <>
-        <Header />
-        <div className="about-job-bg-container">{this.renderJobDetails()}</div>
-      </>
-    )
+    const {jobDetails, similarJobDetails} = this.state
+
+    console.log(jobDetails)
+    console.log(similarJobDetails)
+    return <div>{this.renderPageView()}</div>
   }
 }
 
